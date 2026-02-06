@@ -1,23 +1,62 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Student } from './models/Student';
 import { StudentForm } from './components/StudentForm';
 import { StudentTable } from './components/StudentTable';
+import { StudentStats } from './components/StudentStats';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
-import { Search, Plus, GraduationCap, LayoutDashboard, Users, Settings } from 'lucide-react';
+import { exportToExcel, exportToPDF } from './utils/exportUtils';
+import { 
+  Search, 
+  Plus, 
+  GraduationCap, 
+  LayoutDashboard, 
+  Users, 
+  Settings, 
+  FileSpreadsheet, 
+  FileText,
+  Download
+} from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
 // Mock initial data
-const INITIAL_STUDENTS = [
-  new Student('B20DCCN001', 'Nguyễn Văn Anh', '2002-05-15', 'D20CQCN01-B', 3.8),
-  new Student('B20DCCN002', 'Lê Thị Bình', '2002-08-22', 'D20CQCN01-B', 3.4),
-  new Student('B20DCCN003', 'Trần Văn Chung', '2002-01-10', 'D20CQCN02-N', 2.9),
+const INITIAL_STUDENTS_DATA = [
+  { id: 'B20DCCN001', name: 'Nguyễn Văn Anh', dob: '2002-05-15', className: 'D20CQCN01-B', gpa: 3.8 },
+  { id: 'B20DCCN002', name: 'Lê Thị Bình', dob: '2002-08-22', className: 'D20CQCN01-B', gpa: 3.4 },
+  { id: 'B20DCCN003', name: 'Trần Văn Chung', dob: '2002-01-10', className: 'D20CQCN02-N', gpa: 2.9 },
+  { id: 'B20DCCN004', name: 'Phạm Minh Đức', dob: '2002-11-30', className: 'D20CQCN02-N', gpa: 3.1 },
+  { id: 'B20DCCN005', name: 'Hoàng Thu Hà', dob: '2002-03-25', className: 'D20CQCN01-B', gpa: 3.9 },
 ];
 
 export default function App() {
-  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [students, setStudents] = useState<Student[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load from LocalStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('edu_students');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setStudents(parsed.map((s: any) => new Student(s.id, s.name, s.dob, s.className, s.gpa)));
+      } catch (e) {
+        console.error('Failed to parse saved students', e);
+        setStudents(INITIAL_STUDENTS_DATA.map(s => new Student(s.id, s.name, s.dob, s.className, s.gpa)));
+      }
+    } else {
+      setStudents(INITIAL_STUDENTS_DATA.map(s => new Student(s.id, s.name, s.dob, s.className, s.gpa)));
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save to LocalStorage
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('edu_students', JSON.stringify(students.map(s => s.toObject())));
+    }
+  }, [students, isLoaded]);
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => 
@@ -29,12 +68,8 @@ export default function App() {
 
   const handleAddOrUpdate = (data: any) => {
     if (editingStudent) {
-      // Update existing student using the class method requirement
       const updatedStudents = students.map(s => {
         if (s.id === data.id) {
-          // In a real React app we'd create a new object, 
-          // but to satisfy "methods to update info", we update the instance
-          // then set state with a copy to trigger re-render
           s.updateInfo(data.name, data.dob, data.className, data.gpa);
           return new Student(s.id, s.name, s.dob, s.className, s.gpa);
         }
@@ -43,7 +78,6 @@ export default function App() {
       setStudents(updatedStudents);
       toast.success(`Đã cập nhật thông tin sinh viên ${data.name}`);
     } else {
-      // Add new student
       if (students.some(s => s.id === data.id)) {
         toast.error('Mã sinh viên đã tồn tại!');
         return;
@@ -72,11 +106,21 @@ export default function App() {
     }
   };
 
+  const handleExportExcel = () => {
+    exportToExcel(students);
+    toast.success('Đã xuất file Excel thành công');
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(students);
+    toast.success('Đã xuất file PDF thành công');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       <Toaster position="top-right" richColors />
       
-      {/* Sidebar - Desktop Only */}
+      {/* Sidebar */}
       <aside className="hidden lg:flex w-64 bg-slate-900 flex-col text-slate-300">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800">
           <div className="bg-blue-500 p-2 rounded-lg">
@@ -99,13 +143,6 @@ export default function App() {
             <span className="font-medium">Cài đặt</span>
           </a>
         </nav>
-        
-        <div className="p-4 border-t border-slate-800">
-          <div className="bg-slate-800 p-4 rounded-xl">
-            <p className="text-xs text-slate-400 mb-2 uppercase tracking-widest font-bold">Hệ thống quản lý</p>
-            <p className="text-sm font-medium text-white">Phiên bản v1.0.2</p>
-          </div>
-        </div>
       </aside>
 
       {/* Main Content */}
@@ -126,6 +163,26 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-3 ml-4">
+            <div className="flex items-center bg-slate-100 rounded-lg p-1 mr-2">
+              <button 
+                onClick={handleExportExcel}
+                className="p-2 hover:bg-white rounded-md transition-all text-slate-600 hover:text-green-600 flex items-center gap-1.5"
+                title="Xuất Excel"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span className="text-xs font-medium">Excel</span>
+              </button>
+              <div className="w-px h-4 bg-slate-300 mx-1"></div>
+              <button 
+                onClick={handleExportPDF}
+                className="p-2 hover:bg-white rounded-md transition-all text-slate-600 hover:text-red-600 flex items-center gap-1.5"
+                title="Xuất PDF"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="text-xs font-medium">PDF</span>
+              </button>
+            </div>
+
             <button 
               onClick={() => {
                 setEditingStudent(null);
@@ -141,7 +198,7 @@ export default function App() {
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-6xl mx-auto space-y-8">
+          <div className="max-w-6xl mx-auto space-y-8 pb-12">
             {/* Banner Section */}
             <div className="relative h-48 rounded-2xl overflow-hidden shadow-md group">
               <ImageWithFallback 
@@ -152,9 +209,15 @@ export default function App() {
               <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 to-transparent flex flex-col justify-center px-10">
                 <h1 className="text-3xl font-bold text-white mb-2">Quản lý Sinh viên</h1>
                 <p className="text-slate-200 text-lg max-w-md">
-                  Hệ thống lưu trữ và quản lý thông tin sinh viên tập trung, hiện đại và bảo mật.
+                  Phân tích dữ liệu học thuật và quản lý hồ sơ sinh viên hiệu quả.
                 </p>
               </div>
+            </div>
+
+            {/* Stats Section */}
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-slate-800">Thống kê & Phân tích</h2>
+              <StudentStats students={students} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -162,7 +225,7 @@ export default function App() {
               <div className="lg:col-span-8 space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    Danh sách sinh viên
+                    Danh sách chi tiết
                     <span className="bg-blue-100 text-blue-600 px-2.5 py-0.5 rounded-full text-xs font-bold">
                       {filteredStudents.length}
                     </span>
@@ -176,10 +239,10 @@ export default function App() {
                 />
               </div>
 
-              {/* Form Section / Stats Sidebar */}
+              {/* Form Section */}
               <div className="lg:col-span-4 space-y-6">
                 {isFormOpen ? (
-                  <div className="sticky top-24">
+                  <div className="sticky top-24 animate-in fade-in slide-in-from-right-4 duration-300">
                     <StudentForm 
                       onSubmit={handleAddOrUpdate} 
                       initialData={editingStudent ? editingStudent.toObject() : null}
@@ -191,37 +254,32 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="space-y-6 sticky top-24">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold text-slate-800 mb-4">Thống kê nhanh</h3>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 text-sm">Tổng sinh viên</span>
-                          <span className="font-bold text-slate-800">{students.length}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 text-sm">GPA Trung bình</span>
-                          <span className="font-bold text-blue-600">
-                            {(students.reduce((acc, curr) => acc + curr.gpa, 0) / (students.length || 1)).toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="pt-2">
-                          <div className="flex justify-between text-xs text-slate-400 mb-1">
-                            <span>Mục tiêu hoàn thành</span>
-                            <span>100%</span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-blue-500 h-full w-[100%]"></div>
-                          </div>
-                        </div>
+                    <div className="bg-blue-600 p-6 rounded-xl shadow-lg text-white relative overflow-hidden">
+                      <Download className="absolute -right-4 -bottom-4 w-24 h-24 text-white/10" />
+                      <h3 className="font-bold mb-2">Xuất dữ liệu ngay</h3>
+                      <p className="text-blue-100 text-sm mb-4">Lưu lại toàn bộ danh sách sinh viên dưới định dạng Excel hoặc PDF để báo cáo.</p>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={handleExportExcel}
+                          className="flex-1 bg-white text-blue-600 py-2 rounded-lg text-sm font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
+                        >
+                          <FileSpreadsheet className="w-4 h-4" /> Excel
+                        </button>
+                        <button 
+                          onClick={handleExportPDF}
+                          className="flex-1 bg-blue-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-blue-400 transition-colors flex items-center justify-center gap-1"
+                        >
+                          <FileText className="w-4 h-4" /> PDF
+                        </button>
                       </div>
                     </div>
                     
                     <button 
                       onClick={() => setIsFormOpen(true)}
-                      className="w-full py-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/30 transition-all flex flex-col items-center gap-2 group"
+                      className="w-full py-6 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/30 transition-all flex flex-col items-center gap-2 group"
                     >
-                      <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                      <span className="font-medium text-sm">Thêm bản ghi mới</span>
+                      <Plus className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                      <span className="font-bold">Thêm sinh viên mới</span>
                     </button>
                   </div>
                 )}
