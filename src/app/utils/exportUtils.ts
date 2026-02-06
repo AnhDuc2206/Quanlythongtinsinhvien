@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { Student } from '../models/Student';
 
@@ -19,7 +19,7 @@ export const exportToExcel = (students: Student[]) => {
 };
 
 export const exportToPDF = (students: Student[]) => {
-  const doc = new jsPDF() as any;
+  const doc = new jsPDF();
   
   // Title
   doc.setFontSize(18);
@@ -36,7 +36,7 @@ export const exportToPDF = (students: Student[]) => {
     s.gpa.toString()
   ]);
 
-  doc.autoTable({
+  autoTable(doc, {
     head: [tableColumn],
     body: tableRows,
     startY: 30,
